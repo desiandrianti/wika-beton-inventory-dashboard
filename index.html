@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wika Beton Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .start-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background-color: #0066cc;
+      color: white;
+      transition: all 0.3s ease;
+      box-shadow: 0 8px 16px rgba(0, 102, 204, 0.3);
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .start-button:hover {
+      transform: scale(1.1);
+      box-shadow: 0 12px 24px rgba(0, 102, 204, 0.4);
+      background-color: #0052a3;
+    }
+
+    .arrow-icon {
+      width: 40px;
+      height: 40px;
+      margin-left: 2px;
+    }
+  </style>
+</head>
+<body class="bg-white">
+  <div class="min-h-screen flex items-center justify-center">
+    <div class="text-center">
+      <div class="mb-6">
+        <img
+          src="https://www.wika-beton.co.id/wp-content/uploads/2023/12/LOGO-WIKA-BETON-2024-1-1024x241.png.webp"
+          alt="Wika Beton Logo"
+          class="max-w-xs mx-auto"
+          onerror="this.onerror=null; this.src=''; this.alt='Wika Beton';"
+        />
+      </div>
+      <h1 class="text-6xl font-extrabold text-[#00AEEF] mb-8 font-montserrat uppercase tracking-wide">
+        INVENTORY DASHBOARD
+      </h1>
+      <a href="dashboard.html" class="start-button">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+        </svg>
+      </a>
+    </div>
+  </div>
+</body>
+</html>
+</create_file>
+
+<create_file>
+<path>css/style.css</path>
+<content>
+:root {
+    --primary-color: #0047AB;
+    --secondary-color: #ffffff;
+    --accent-color: #f5f5f5;
+    --text-color: #333333;
+}
+
+body {
+    font-family: 'Montserrat', sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+.start-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    color: white;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.start-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Dashboard Styles */
+.sidebar {
+    background-color: var(--primary-color);
+    color: var(--secondary-color);
+    width: 250px;
+    transition: all 0.3s ease;
+}
+
+.sidebar.collapsed {
+    width: 60px;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    color: var(--secondary-color);
+    text-decoration: none;
+    transition: background-color 0.3s ease;
+}
+
+.nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Tab Styles */
+.tab-container {
+    border-bottom: 2px solid var(--accent-color);
+}
+
+.tab {
+    padding: 1rem 2rem;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.tab.active {
+    border-bottom-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+/* Card Styles */
+.metric-card {
+    background: var(--secondary-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Chart Container Styles */
+.chart-container {
+    background: var(--secondary-color);
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
