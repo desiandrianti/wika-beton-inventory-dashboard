@@ -1,0 +1,580 @@
+.overwrite:true
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard Persediaan - Wika Beton</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* Section Transitions */
+    .section {
+        opacity: 1;
+        transition: opacity 0.5s ease-in-out;
+        will-change: opacity;
+        display: block;
+    }
+
+    .section.hidden {
+        opacity: 0;
+        display: none;
+        pointer-events: none;
+    }
+
+    main {
+        position: relative;
+        min-height: 100vh;
+    }
+
+    /* Notifications */
+    .notification {
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        padding: 1.25rem;
+        border-radius: 0.5rem;
+        color: white;
+        max-width: 24rem;
+        z-index: 50;
+        animation: slideIn 0.3s ease-out;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .notification.success {
+        background-color: #059669;
+    }
+
+    .notification.success::before {
+        content: '✓';
+        font-size: 1.25rem;
+        font-weight: bold;
+    }
+
+    .notification.error {
+        background-color: #dc2626;
+    }
+
+    .notification.error::before {
+        content: '!';
+        font-size: 1.25rem;
+        font-weight: bold;
+        width: 1.25rem;
+        height: 1.25rem;
+        border: 2px solid currentColor;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+    }
+
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes slideOut {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+
+    /* Loading Indicator */
+    .loading-indicator {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(255, 255, 255, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 40;
+    }
+
+    .loading-indicator.hidden {
+        display: none;
+    }
+
+    .tab-scroll-container {
+      margin: -2rem -2rem 2rem -2rem;
+      padding: 1rem 2rem;
+      background: white;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid #e5e7eb;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    
+    .tab-list {
+      display: flex;
+      gap: 1rem;
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+      margin: 0 -1rem;
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+
+    .chart-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+      gap: 2rem;
+      padding: 1rem;
+    }
+
+    .chart-container {
+      background: white;
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      height: 350px;
+    }
+  </style>
+</head>
+<body class="bg-gray-50">
+  <div class="flex h-screen">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar">
+      <div class="p-4 flex justify-end">
+        <button id="toggleSidebar" class="text-white">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
+      <nav class="mt-8 flex flex-col space-y-2">
+        <button type="button" tabindex="0" class="nav-link active" data-target="inventory-section">
+          <svg xmlns="http://www.w3.org/2000/svg" class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          <span class="nav-text">Inventory Management</span>
+        </button>
+        <button type="button" tabindex="0" class="nav-link" data-target="upload-section">
+          <svg xmlns="http://www.w3.org/2000/svg" class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          </svg>
+          <span class="nav-text">Upload Data</span>
+        </button>
+        <a href="index.html" class="nav-link">
+          <svg xmlns="http://www.w3.org/2000/svg" class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          <span class="nav-text">Logout</span>
+        </a>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto p-8">
+      <!-- Inventory Section -->
+      <section id="inventory-section" class="section">
+        <div class="tab-scroll-container">
+          <div class="tab-list">
+            <button class="tab active" data-tab="ok">OK</button>
+            <button class="tab" data-tab="spprb">SPPRB</button>
+            <button class="tab" data-tab="produksi">Produksi</button>
+            <button class="tab" data-tab="distribusi">Distribusi</button>
+            <button class="tab" data-tab="lancar">Stok Lancar</button>
+            <button class="tab" data-tab="bebas">Stok Bebas</button>
+            <button class="tab" data-tab="titipan-percepatan">Titipan Percepatan</button>
+            <button class="tab" data-tab="titipan-murni">Titipan Murni</button>
+            <button class="tab" data-tab="op">OP</button>
+            <button class="tab" data-tab="ppb">PPB</button>
+            <button class="tab" data-tab="site">Site</button>
+          </div>
+        </div>
+
+        <div class="tab-content-wrapper">
+          <!-- Tab OK -->
+          <div class="tab-content" id="tab-ok">
+            <h3 class="text-2xl font-semibold mb-6">Monitoring OK</h3>
+            <div class="chart-grid">
+              <div class="chart-container">
+                <canvas id="chart-ok-sbu"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-ok-sbu-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-ok-ppb"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-ok-ppb-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-ok-tahun"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-ok-tahun-saldo"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab SPPRB -->
+          <div class="tab-content hidden" id="tab-spprb">
+            <h3 class="text-2xl font-semibold mb-6">Monitoring SPPRB</h3>
+            <div class="chart-grid">
+              <div class="chart-container">
+                <canvas id="chart-spprb-sbu"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-spprb-sbu-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-spprb-ppb"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-spprb-ppb-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-spprb-tahun"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-spprb-tahun-saldo"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab Produksi -->
+          <div class="tab-content hidden" id="tab-produksi">
+            <h3 class="text-2xl font-semibold mb-6">Monitoring Produksi</h3>
+            <div class="chart-grid">
+              <div class="chart-container">
+                <canvas id="chart-produksi-sbu"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-produksi-ppb"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-produksi-area"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-produksi-tahun"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-produksi-proporsi"></canvas>
+              </div>
+            </div>
+          </div>
+          <!-- Tab Distribusi -->
+          <div class="tab-content hidden" id="tab-distribusi">
+            <h3 class="text-2xl font-semibold mb-6">Monitoring Distribusi</h3>
+            <div class="chart-grid">
+              <div class="chart-container">
+                <canvas id="chart-distribusi-sbu"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-distribusi-sbu-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-distribusi-ppb"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-distribusi-ppb-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-distribusi-tahun"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-distribusi-tahun-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-distribusi-mutasi-tahun"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-distribusi-mutasi-saldo-tahun"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab Stok Lancar -->
+          <div class="tab-content hidden" id="tab-lancar">
+            <h3 class="text-2xl font-semibold mb-6">Monitoring Stok Lancar</h3>
+            <div class="chart-grid">
+              <div class="chart-container">
+                <canvas id="chart-lancar-sbu"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-lancar-sbu-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-lancar-ppb"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-lancar-ppb-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-lancar-tahun"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-lancar-tahun-saldo"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab Stok Bebas -->
+          <div class="tab-content hidden" id="tab-bebas">
+            <h3 class="text-2xl font-semibold mb-6">Monitoring Stok Bebas</h3>
+            <div class="chart-grid">
+              <div class="chart-container">
+                <canvas id="chart-bebas-sbu"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-bebas-sbu-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-bebas-ppb"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-bebas-ppb-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-bebas-range-umur"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-bebas-range-umur-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-bebas-tahun"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-bebas-tahun-saldo"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab Titipan Percepatan -->
+          <div class="tab-content hidden" id="tab-titipan-percepatan">
+            <h3 class="text-2xl font-semibold mb-6">Monitoring Titipan Percepatan</h3>
+            <div class="chart-grid">
+              <div class="chart-container">
+                <canvas id="chart-titipan-percepatan-sbu"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-titipan-percepatan-sbu-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-titipan-percepatan-ppb"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-titipan-percepatan-ppb-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-titipan-percepatan-range-umur"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-titipan-percepatan-range-umur-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-titipan-percepatan-tahun"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-titipan-percepatan-tahun-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-titipan-percepatan-mutasi-tahun"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-titipan-percepatan-mutasi-saldo-tahun"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab Titipan Murni -->
+          <div class="tab-content hidden" id="tab-titipan-murni">
+            <h3 class="text-2xl font-semibold mb-6">Monitoring Titipan Murni</h3>
+            <div class="chart-grid">
+              <div class="chart-container">
+                <canvas id="chart-titipan-murni-sbu"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-titipan-murni-sbu-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-titipan-murni-ppb"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-titipan-murni-ppb-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-titipan-murni-range-umur"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-titipan-murni-range-umur-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-titipan-murni-tahun"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-titipan-murni-tahun-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-titipan-murni-mutasi-tahun"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-titipan-murni-mutasi-saldo-tahun"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab OP -->
+          <div class="tab-content hidden" id="tab-op">
+            <h3 class="text-2xl font-semibold mb-6">Monitoring OP</h3>
+            <div class="chart-grid">
+              <div class="chart-container">
+                <canvas id="chart-op-sbu"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-op-sbu-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-op-ppb"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-op-ppb-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-op-tahun"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-op-tahun-saldo"></canvas>
+              </div>
+            </div>
+          </div>
+          <!-- Tab PPB -->
+          <div class="tab-content hidden" id="tab-ppb">
+            <h3 class="text-2xl font-semibold mb-6">Monitoring PPB</h3>
+            <div class="chart-grid">
+              <div class="chart-container">
+                <canvas id="chart-ppb-sbu"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-ppb-sbu-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-ppb-ppb"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-ppb-ppb-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-ppb-range-umur"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-ppb-range-umur-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-ppb-tahun"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-ppb-tahun-saldo"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab Site -->
+          <div class="tab-content hidden" id="tab-site">
+            <h3 class="text-2xl font-semibold mb-6">Monitoring Site</h3>
+            <div class="chart-grid">
+              <div class="chart-container">
+                <canvas id="chart-site-sbu"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-site-sbu-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-site-ppb"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-site-ppb-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-site-range-umur"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-site-range-umur-saldo"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-site-tahun"></canvas>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-site-tahun-saldo"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Upload Section -->
+      <section id="upload-section" class="section hidden">
+        <div class="max-w-4xl mx-auto">
+          <div class="bg-white p-8 rounded-lg shadow-lg">
+            <div class="text-center mb-8">
+              <h2 class="text-2xl font-semibold text-gray-800 mb-2">Upload Data Persediaan</h2>
+              <p class="text-gray-600">Upload file Excel dengan format yang sesuai untuk memperbarui data persediaan</p>
+            </div>
+
+            <div class="upload-container">
+              <input type="file" id="excelFile" accept=".xlsx,.xls" class="hidden">
+              <label for="excelFile" class="cursor-pointer block">
+                <div class="p-8 border-2 border-dashed border-blue-400 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all duration-300">
+                  <div class="text-center">
+                    <svg class="mx-auto h-12 w-12 text-blue-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                      <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <p class="mt-4 text-sm text-gray-600">Click to upload or drag and drop</p>
+                    <p class="mt-2 text-xs text-gray-500">Excel files only (.xlsx, .xls)</p>
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            <!-- Preview Section -->
+            <div id="preview-section" class="hidden mt-8">
+              <h3 class="text-lg font-medium text-gray-700 mb-4">Preview Data</h3>
+              <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div id="preview-table" class="overflow-x-auto"></div>
+              </div>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div class="loading-indicator hidden mt-4">
+              <div class="flex items-center justify-center">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                <p class="ml-3 text-gray-600">Processing file...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="js/charts_fixed.js" defer></script>
+  <script src="js/upload.js" defer></script>
+  <script src="js/main.js" defer></script>
+</body>
+</html>
