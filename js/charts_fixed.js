@@ -23,7 +23,14 @@ const chartConfigs = {
 const remainingTabs = {
     spprb: { prefix: 'SPPRB', stokField: 'stok_spprb', saldoField: 'saldo_spprb' },
     produksi: { prefix: 'PRODUKSI', stokField: 'stok_produksi_saat_ini', saldoField: null },
-    distribusi: { prefix: 'DISTRIBUSI', stokField: 'stok_distribusi', saldoField: 'saldo_distribusi', mutasiStokField: 'mutasi_stok_distribusi', mutasiSaldoField: 'mutasi_saldo_distribusi' },
+    distribusi: { 
+        prefix: 'DISTRIBUSI', 
+        stokField: 'stok_distribusi', 
+        saldoField: 'saldo_distribusi', 
+        mutasiStokField: 'mutasi_stok_distribusi', 
+        mutasiSaldoField: 'mutasi_saldo_distribusi',
+        hasMutasi: true 
+    },
     lancar: { prefix: 'LANCAR', stokField: 'stok_lancar', saldoField: 'saldo_lancar' },
     bebas: { prefix: 'BEBAS', stokField: 'stok_bebas', saldoField: 'saldo_bebas', hasRangeUmur: true },
     'titipan-percepatan': { 
@@ -106,49 +113,270 @@ Object.entries(remainingTabs).forEach(([key, config]) => {
     chartConfigs[key] = configs;
 });
 
-// Helper function to create charts
-function createChart(ctx, type, labels, data, label, backgroundColor) {
-    const baseOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            tooltip: {
-                enabled: true,
-                callbacks: {
-                    label: function(context) {
-                        let label = context.dataset.label || '';
-                        if (label) {
-                            label += ': ';
+    // Helper function to create charts
+    function createChart(ctx, type, labels, data, label, backgroundColor) {
+        const baseOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                tooltip: {
+                    enabled: true,
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            const value = context.parsed.y ?? context.parsed;
+                            if (value === null || value === undefined) {
+                                label += 'Data tidak tersedia';
+                            } else if (label.toLowerCase().includes('saldo')) {
+                                label += new Intl.NumberFormat('id-ID', {
+                                    style: 'currency',
+                                    currency: 'IDR',
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 0
+                                }).format(value);
+                            } else {
+                                label += value.toLocaleString('id-ID');
+                            }
+                            return label;
                         }
-                        const value = context.parsed.y ?? context.parsed;
-                        if (value === null || value === undefined) {
-                            label += 'Data tidak tersedia';
-                        } else if (label.toLowerCase().includes('saldo')) {
-                            label += new Intl.NumberFormat('id-ID', {
-                                style: 'currency',
-                                currency: 'IDR',
-                                minimumFractionDigits: 0,
-                                maximumFractionDigits: 0
-                            }).format(value);
-                        } else {
-                            label += value.toLocaleString('id-ID');
-                        }
-                        return label;
                     }
-                }
-            },
-            legend: {
-                display: type === 'pie',
-                position: 'right'
-            },
-            title: {
-                display: true,
-                text: label,
-                font: {
-                    size: 16,
-                    weight: 'bold'
-                }
-            },
+                },
+                legend: {
+                    display: type === 'pie',
+                    position: 'right'
+                },
+                title: {
+                    display: true,
+                    text: label,
+                    font: {
+                        size: 16,
+                        weight: 'bold'
+                    }
+                },
+                // Add a custom plugin to show "No Data" message
+                noData: {
+                    id: 'noData',
+                    beforeDraw(chart, args, options) {
+                        const {ctx, data, chartArea: {left, top, width, height}} = chart;
+                        
+                        if (data.datasets[0].data.length === 0 || data.datasets[0].data.every(d => d === 0)) {
+                            ctx.save();
+                            
+                            // Draw gradient background
+                            const gradient = ctx.createLinearGradient(left, top, left, top + height);
+                            gradient.addColorStop(0, 'rgba(249, 250, 251, 0.95)');
+                            gradient.addColorStop(1, 'rgba(249, 250, 251, 0.85)');
+                            ctx.fillStyle = gradient;
+                            ctx.fillRect(left, top, width, height);
+                            
+                            // Store card dimensions for hover detection
+                            chart._emptyStateCard = {
+                                width: Math.min(300, width - 40),
+                                height: 140,
+                                left: left + (width - Math.min(300, width - 40)) / 2,
+                                top: top + (height - 140) / 2
+                            };
+                            
+                            const { width: cardWidth, height: cardHeight, left: cardLeft, top: cardTop } = chart._emptyStateCard;
+                            
+                            // Easing function for smoother animation
+                            function easeOutCubic(x) {
+                                return 1 - Math.pow(1 - x, 3);
+                            }
+                            
+                            // Calculate hover progress with easing (0 to 1)
+                            const now = Date.now();
+                            if (!chart._hoverStartTime) chart._hoverStartTime = now;
+                            const hoverDuration = 200; // 200ms transition
+                            
+                            let progress = 0;
+                            if (chart._isHovered) {
+                                progress = Math.min(1, (now - chart._hoverStartTime) / hoverDuration);
+                            } else {
+                                progress = Math.max(0, 1 - (now - chart._hoverStartTime) / hoverDuration);
+                            }
+                            
+                            // Apply easing to the progress
+                            const hoverProgress = easeOutCubic(progress);
+                            
+                            // Store the animation frame ID for cleanup
+                            if (!chart._animationFrame) {
+                                chart._animationFrame = null;
+                            }
+                            
+                            // Interpolate values based on hover progress
+                            const shadowBlur = 10 + (6 * hoverProgress);
+                            const shadowOffsetY = 4 + (2 * hoverProgress);
+                            const borderWidth = 1 + hoverProgress;
+                            
+                            // Calculate background color interpolation
+                            const bgR = Math.round(255 + (248 - 255) * hoverProgress);
+                            const bgG = Math.round(255 + (250 - 255) * hoverProgress);
+                            const bgB = Math.round(255 + (255 - 255) * hoverProgress);
+                            
+                            // Draw card shadow with smooth transition
+                            ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
+                            ctx.shadowBlur = shadowBlur;
+                            ctx.shadowOffsetY = shadowOffsetY;
+                            
+                            // Draw card background with smooth color transition
+                            ctx.fillStyle = `rgb(${bgR}, ${bgG}, ${bgB})`;
+                            ctx.beginPath();
+                            ctx.roundRect(cardLeft, cardTop, cardWidth, cardHeight, 12);
+                            ctx.fill();
+                            
+                            // Reset shadow
+                            ctx.shadowColor = 'transparent';
+                            ctx.shadowBlur = 0;
+                            ctx.shadowOffsetY = 0;
+                            
+                            // Calculate border color interpolation
+                            const borderR = Math.round(229 + (59 - 229) * hoverProgress);
+                            const borderG = Math.round(231 + (130 - 231) * hoverProgress);
+                            const borderB = Math.round(235 + (246 - 235) * hoverProgress);
+                            
+                            // Draw card border with smooth color transition
+                            ctx.strokeStyle = `rgb(${borderR}, ${borderG}, ${borderB})`;
+                            ctx.lineWidth = borderWidth;
+                            ctx.beginPath();
+                            ctx.roundRect(cardLeft, cardTop, cardWidth, cardHeight, 12);
+                            ctx.stroke();
+                            
+                            // Add mousemove and mouseleave listeners for hover effect if not already added
+                            if (!chart._hasHoverListener) {
+                                const handleMouseMove = function(evt) {
+                                    const rect = chart.canvas.getBoundingClientRect();
+                                    const x = evt.clientX - rect.left;
+                                    const y = evt.clientY - rect.top;
+                                    
+                                    const card = chart._emptyStateCard;
+                                    const wasHovered = chart._isHovered;
+                                    chart._isHovered = (
+                                        x >= card.left && x <= card.left + card.width &&
+                                        y >= card.top && y <= card.top + card.height
+                                    );
+                                    
+                                    if (wasHovered !== chart._isHovered) {
+                                        chart._hoverStartTime = Date.now();
+                                        // Cancel any existing animation
+                                        if (chart._animationFrame) {
+                                            cancelAnimationFrame(chart._animationFrame);
+                                        }
+                                        
+                                        // Start new animation
+                                        function animate() {
+                                            chart.draw();
+                                            if (chart._isHovered && progress < 1 || !chart._isHovered && progress > 0) {
+                                                chart._animationFrame = requestAnimationFrame(animate);
+                                            } else {
+                                                chart._animationFrame = null;
+                                            }
+                                        }
+                                        chart._animationFrame = requestAnimationFrame(animate);
+                                    }
+                                };
+                                
+                                const handleMouseLeave = function() {
+                                    if (chart._isHovered) {
+                                        chart._isHovered = false;
+                                        chart._hoverStartTime = Date.now();
+                                        
+                                        // Cancel any existing animation
+                                        if (chart._animationFrame) {
+                                            cancelAnimationFrame(chart._animationFrame);
+                                        }
+                                        
+                                        // Start new animation
+                                        function animate() {
+                                            chart.draw();
+                                            if (progress > 0) {
+                                                chart._animationFrame = requestAnimationFrame(animate);
+                                            } else {
+                                                chart._animationFrame = null;
+                                            }
+                                        }
+                                        chart._animationFrame = requestAnimationFrame(animate);
+                                    }
+                                };
+                                
+                                // Clean up animation frame on chart destroy
+                                const originalDestroy = chart.destroy;
+                                chart.destroy = function() {
+                                    if (chart._animationFrame) {
+                                        cancelAnimationFrame(chart._animationFrame);
+                                    }
+                                    originalDestroy.call(chart);
+                                };
+                                
+                                chart.canvas.addEventListener('mousemove', handleMouseMove);
+                                chart.canvas.addEventListener('mouseleave', handleMouseLeave);
+                                chart._hasHoverListener = true;
+                            }
+                            
+                            // Draw upload icon with blue background
+                            const iconSize = 40;
+                            const iconLeft = cardLeft + (cardWidth - iconSize) / 2;
+                            const iconTop = cardTop + 20;
+                            
+                            ctx.fillStyle = '#EBF5FF';
+                            ctx.beginPath();
+                            ctx.arc(iconLeft + iconSize/2, iconTop + iconSize/2, iconSize/2, 0, Math.PI * 2);
+                            ctx.fill();
+                            
+                            ctx.font = '24px Poppins';
+                            ctx.fillStyle = '#3B82F6';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillText('⬆️', iconLeft + iconSize/2, iconTop + iconSize/2);
+                            
+                            // Draw "No Data" message
+                            ctx.font = 'bold 16px Poppins';
+                            ctx.fillStyle = '#374151';
+                            ctx.fillText('Belum ada data tersedia', cardLeft + cardWidth/2, cardTop + 80);
+                            
+                            // Draw helper text with underline
+                            const helperText = 'Silakan upload file Excel untuk melihat grafik';
+                            ctx.font = '13px Poppins';
+                            ctx.fillStyle = '#3B82F6';
+                            ctx.fillText(helperText, cardLeft + cardWidth/2, cardTop + 105);
+                            
+                            // Add underline to text
+                            const textWidth = ctx.measureText(helperText).width;
+                            ctx.beginPath();
+                            ctx.moveTo(cardLeft + cardWidth/2 - textWidth/2, cardTop + 108);
+                            ctx.lineTo(cardLeft + cardWidth/2 + textWidth/2, cardTop + 108);
+                            ctx.strokeStyle = '#3B82F6';
+                            ctx.lineWidth = 1;
+                            ctx.stroke();
+                            
+                            ctx.restore();
+                            
+                            // Add click handler for the empty state message
+                            chart.canvas.onclick = function(evt) {
+                                const rect = chart.canvas.getBoundingClientRect();
+                                const x = evt.clientX - rect.left;
+                                const y = evt.clientY - rect.top;
+                                
+                                // Check if click is within the card area
+                                if (x >= cardLeft && x <= cardLeft + cardWidth &&
+                                    y >= cardTop && y <= cardTop + cardHeight) {
+                                    // Navigate to Upload Data section
+                                    document.querySelector('[data-target="upload-section"]').click();
+                                }
+                            };
+                            
+                            // Change cursor to pointer when hovering over the card
+                            chart.canvas.style.cursor = 'pointer';
+                        } else {
+                            // Reset cursor and click handler when there is data
+                            chart.canvas.style.cursor = 'default';
+                            chart.canvas.onclick = null;
+                        }
+                    }
+                },
             datalabels: {
                 display: function(context) {
                     // Always display label even if value is zero
@@ -292,6 +520,33 @@ function updateCharts(tab, data) {
         data = [];
     }
 
+    // Helper function to get all possible group keys for a groupBy type
+    function getAllGroupKeys(groupBy) {
+        switch (groupBy) {
+            case 'tahun':
+                // Assuming years from 2018 to current year 
+                const currentYear = new Date().getFullYear();
+                const years = [];
+                for (let y = 2018; y <= currentYear; y++) {
+                    years.push(y.toString());
+                }
+                return years;
+            case 'range_umur':
+                return ['0-1 tahun', '2-3 tahun', '4-5 tahun', '6-7 tahun', '> 8 tahun'];
+            case 'sbu':
+                // Example SBU list - should be replaced with actual SBU list if available
+                return ['BR', 'HD', 'MR', 'PI', 'PO', 'RT', 'RY'];
+            case 'ppb':
+                // Example PPB list - should be replaced with actual PPB list if available
+                return ['BGR', 'BYL', 'MJK', 'PSR'];
+            case 'area':
+                // Example AREA list
+                return ['JABAR', 'JATENG', 'JATIM', 'BALI', 'NTT', 'NTB'];
+            default:
+                return [];
+        }
+    }
+
     Object.keys(charts[tab]).forEach(chartId => {
         const chart = charts[tab][chartId];
         const config = chartConfigs[tab]?.find(c => `chart-${tab}-${c.id}` === chartId);
@@ -312,6 +567,16 @@ function updateCharts(tab, data) {
                 acc[groupKey] = (acc[groupKey] || 0) + (parseFloat(item[config.field]) || 0);
                 return acc;
             }, {});
+
+            // Get all possible group keys for this groupBy
+            const allGroupKeys = getAllGroupKeys(config.groupBy);
+
+            // Fill missing group keys with zero values
+            allGroupKeys.forEach(key => {
+                if (!(key in aggregateData)) {
+                    aggregateData[key] = 0;
+                }
+            });
 
             const sortedEntries = Object.entries(aggregateData).sort((a, b) => {
                 if (config.groupBy === 'tahun') {
