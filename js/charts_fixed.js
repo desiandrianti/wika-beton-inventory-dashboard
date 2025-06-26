@@ -90,13 +90,6 @@ const chartConfigs = {
 // Helper function to get all possible group keys for a groupBy type
 function getAllGroupKeys(groupBy) {
     switch (groupBy) {
-        case 'tahun':
-            const currentYear = new Date().getFullYear();
-            const years = [];
-            for (let y = 2018; y <= currentYear; y++) {
-                years.push(y.toString());
-            }
-            return years;
         case 'range_umur':
             return ['0–1 tahun', '2–3 tahun', '4–5 tahun', '6–7 tahun', '> 8 tahun'];
         case 'sbu':
@@ -258,42 +251,78 @@ async function updateCharts(tab, data) {
         
         groups.forEach(group => {
             aggregatedData[group] = {};
-            getAllGroupKeys(group).forEach(key => {
-                aggregatedData[group][key] = {
-                    stok: 0,
-                    saldo: 0,
-                    mutasi_stok: 0,
-                    mutasi_saldo: 0
-                };
-            });
+            // Pre-populate keys for groups except for 'tahun'
+            if (group !== 'tahun') {
+                getAllGroupKeys(group).forEach(key => {
+                    aggregatedData[group][key] = {
+                        stok: 0,
+                        saldo: 0,
+                        mutasi_stok: 0,
+                        mutasi_saldo: 0
+                    };
+                });
+            }
         });
 
         // Process data
         data.forEach(item => {
             groups.forEach(group => {
-                const key = item[group]?.toString() || 'Undefined';
-                if (aggregatedData[group][key]) {
-                    // Get all configs for this group
-                    const configs = chartConfigs[tab].filter(c => c.groupBy === group);
-                    
-                    configs.forEach(config => {
-                        const value = parseFloat(item[config.field]) || 0;
-                        
-                        if (config.field.includes('saldo')) {
-                            aggregatedData[group][key].saldo += value;
-                        } else if (config.field.includes('mutasi')) {
-                            if (config.field.includes('saldo')) {
-                                aggregatedData[group][key].mutasi_saldo += value;
-                            } else {
-                                aggregatedData[group][key].mutasi_stok += value;
-                            }
-                        } else {
-                            aggregatedData[group][key].stok += value;
-                        }
-                    });
+                const key = item[group]?.toString();
+                if (!key) return; // Skip if key is not available
+                
+                // For 'tahun', initialize the key if it does not exist
+                if (group === 'tahun') {
+                    if (!aggregatedData[group].hasOwnProperty(key)) {
+                        aggregatedData[group][key] = {
+                            stok: 0,
+                            saldo: 0,
+                            mutasi_stok: 0,
+                            mutasi_saldo: 0
+                        };
+                    }
                 }
+                
+                // Get all configs for this group
+                const configs = chartConfigs[tab].filter(c => c.groupBy === group);
+                
+                configs.forEach(config => {
+                    const value = parseFloat(item[config.field]) || 0;
+                    
+                    if (config.field.includes('saldo')) {
+                        aggregatedData[group][key].saldo += value;
+                    } else if (config.field.includes('mutasi')) {
+                        if (config.field.includes('saldo')) {
+                            aggregatedData[group][key].mutasi_saldo += value;
+                        } else {
+                            aggregatedData[group][key].mutasi_stok += value;
+                        }
+                    } else {
+                        aggregatedData[group][key].stok += value;
+                    }
+                });
             });
         });
+
+        // Fill in missing years for 'tahun' group if data exists
+        if (Object.keys(aggregatedData['tahun']).length > 0) {
+            // Convert keys to integers and determine min/max years
+            const yearKeys = Object.keys(aggregatedData['tahun']).map(yr => parseInt(yr));
+            const minYear = Math.min(...yearKeys);
+            const maxYear = Math.max(...yearKeys);
+            
+            // Ensure every year between minYear and maxYear exists
+            for (let year = minYear; year <= maxYear; year++) {
+                const key = year.toString();
+                if (!aggregatedData['tahun'].hasOwnProperty(key)) {
+                    aggregatedData['tahun'][key] = {
+                        stok: 0,
+                        saldo: 0,
+                        mutasi_stok: 0,
+                        mutasi_saldo: 0
+                    };
+                }
+            }
+        }
 
         // Update each chart
         const configs = chartConfigs[tab] || [];
